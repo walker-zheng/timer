@@ -1,11 +1,12 @@
-# 简单的 timer
-1. 功能
-  - priority_queue实现简单定时器
-  - 支持 std::function 添加，根据id删除
-  - 支持 时间点、循环、指定次数等，可嵌套组合使用
+## `easy timer`
+1. 功能  
+- priority_queue实现简单定时器
+- 支持 std::function 添加，根据id删除
+- 支持 时间点、循环、指定次数等，可嵌套组合使用
+  
 2. 使用示例：
 ```cpp
-  easy::Timer timer;
+  easy::Timer timer;
   bar b;
   std::vector<int> taskids;
   auto curr = system_clock::now();
@@ -28,9 +29,9 @@
   std::cout << "> timer " << ": " << (duration<double>(curr - now)).count() << "s => Stop!" << std::endl;
 ```
 
-3. timer嵌套：
+3. timer嵌套 每天一个定时器做当天任务：
 ```cpp
-  easy::Timer g_timer;
+  easy::Timer g_timer;
   g_timer.add([ = ]()
   {
       easy::Timer timer;
