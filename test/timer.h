@@ -23,17 +23,20 @@ struct timer_event
     timer_event(int id, callback_type const & callback, time_type const & when, msec_type const & duration = msec_type(0),
         bool loop = false)
         : callback(callback), when(when), duration(duration), loop(loop), id(id)
-    {
-    }
+    {}
     timer_event(const timer_event & other)
         : callback(other.callback), when(other.when), duration(other.duration), loop(other.loop), id(other.id)
-    {
-    }
-    timer_event & operator=(timer_event other)
+    {}
+    timer_event(timer_event && other)
+        : callback(other.callback), when(other.when), duration(other.duration), loop(other.loop), id(other.id)
+    {}
+    timer_event & operator=(timer_event && other)
     {
         swap(other);
         return *this;
     }
+    ~timer_event() {}
+
     void swap(timer_event & other)
     {
         std::swap(callback, other.callback);
@@ -44,12 +47,12 @@ struct timer_event
     }
     void operator()() const
     {
-        //std::cout << "---operator()---" << std::endl;
         callback();
     }
-    timer_event next()
+    timer_event & next()
     {
-        return timer_event(id, callback, when + duration, duration, loop);
+        when += duration;
+        return *this;
     }
 
     callback_type   callback;
@@ -69,10 +72,10 @@ struct event_less : public std::less<timer_event>
 
 class Timer
 {
+    typedef std::chrono::duration<int>      sec_type;
     std::priority_queue<timer_event, std::vector<timer_event>, event_less> event_queue;
     std::unique_ptr<std::thread>            handler;
     std::atomic<bool>                       _stop;
-    typedef std::chrono::duration<int>      sec_type;
     std::atomic<int>                        taskid{ 0 };
     std::map<int, bool>                     invalid;
 public:
@@ -81,7 +84,6 @@ public:
         handler = std::make_unique<std::thread>([this]()
         {
             auto start = std::chrono::system_clock::now();
-            std::cout << "---start---" << std::endl;
 
             while (!_stop)
             {
@@ -90,66 +92,51 @@ public:
                 while (!event_queue.empty() &&
                     (event_queue.top().when < now))
                 {
-                    std::cout << "---" << (std::chrono::duration<double>(std::chrono::system_clock::now() - start)).count()
-                        << "s" << std::endl;
-                    auto & evt = event_queue.top();
+                    auto evt = event_queue.top();
 
-                    if (evt.loop)
+                    if (!invalid[evt.id])
                     {
-                        //std::cout << "---loop next---" << std::endl;
-                        event_queue.emplace(evt.id, evt.callback, evt.when + evt.duration, evt.duration, true);
+                        // async/thread pool
+                        if (evt.loop)
+                        {
+                            event_queue.emplace(evt.next());
+                        }
+
+                        std::async(std::launch::async, [evt]() { evt(); });
                     }
 
                     event_queue.pop();
-                    std::async(std::launch::async, [ = ]()
-                    {
-                        if (!invalid[evt.id])
-                        {
-                            evt();
-                        }
-                    });
                 }
 
-                //std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
         });
     }
-    ~Timer() { stop();  if (handler) { handler->join(); } }
-    int add(const timer_event::callback_type &cb,
-        const std::chrono::time_point<std::chrono::system_clock> &when)
+    ~Timer() { stop(); if (handler) { handler->join(); } }
+
+    int add(const timer_event::callback_type & cb,
+        const std::chrono::time_point<std::chrono::system_clock> & when,
+        const sec_type & duration = sec_type(0), int times = 0)
     {
-        //std::cout << "---add()---" << std::endl;
-        auto id = ++taskid;
-        event_queue.emplace(++taskid, cb, when);
-        return id;
-    }
-    int add(const timer_event::callback_type &cb,
-        const std::chrono::time_point<std::chrono::system_clock> &when, sec_type duration)
-    {
-        //std::cout << "---add()---" << std::endl;
-        auto id = ++taskid;
-        event_queue.emplace(id, cb, when, duration, true);
-        return id;
-    }
-    int add(const timer_event::callback_type &cb,
-        const std::chrono::time_point<std::chrono::system_clock> &when, sec_type duration, int times)
-    {
-        //std::cout << "---add()---" << std::endl;
         auto id = ++taskid;
 
         if (times > 0)
         {
-            int i{ 0 };
+            timer_event task{ id, cb, when, duration };
+            event_queue.emplace(task);
 
-            while (times--)
+            while (--times)
             {
-                i++;
-                event_queue.emplace(id, cb, when + i * duration, duration);
+                event_queue.emplace(task.next());
             }
+        }
+        else if (duration > sec_type(0))
+        {
+            event_queue.emplace(id, cb, when, duration, true);
         }
         else
         {
-            event_queue.emplace(id, cb, when, duration, true);
+            event_queue.emplace(id, cb, when);
         }
 
         return id;
