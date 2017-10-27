@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test", "test\test.vcxproj", "{8A743D35-B97A-4F16-8FB7-329155A92BA2}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "timer", "test\test.vcxproj", "{8A743D35-B97A-4F16-8FB7-329155A92BA2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
