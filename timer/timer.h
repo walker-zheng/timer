@@ -76,7 +76,7 @@ public:
                 while (!event_queue.empty() &&
                     (event_queue.top().when < now))
                 {
-                    auto evt = event_queue.top();
+                    auto evt = std::move(event_queue.top());
 
                     if (!invalid[evt.id])
                     {
